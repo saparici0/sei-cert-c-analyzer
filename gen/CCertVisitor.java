@@ -114,4 +114,15 @@ public class CCertVisitor extends CBaseVisitor {
 
         return super.visitExpression(ctx);
     }
+
+    // POS47-C: Do not use threads that can be canceled asynchronously
+    @Override
+    public Object visitExpressionStatement(CParser.ExpressionStatementContext ctx) {
+        if (ctx.getText().contains("pthread_cancel")) {
+            System.out.printf("Error <%d,%d> ", ctx.getStart().getLine(),
+                ctx.getStart().getCharPositionInLine() + 1);
+            System.out.println("POS47-C. Do not use threads that can be canceled asynchronously");
+        }
+        return super.visitExpressionStatement(ctx);
+    }
 }

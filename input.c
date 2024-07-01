@@ -1,29 +1,30 @@
+#include <pthread.h>
 #include <stdio.h>
-#include <string.h>
-#include <wchar.h>
+#include <stdlib.h>
 
-void checkStringFunctions() {
-    wchar_t wbuf[100];
-    char buf[100];
-
-    // Incorrecto: Usar funciones de cadenas estrechas con cadenas anchas
-    strcpy((char *)wbuf, "test");
-    strcat((char *)wbuf, "test");
-    printf("Length of wide string: %lu\n", strlen((char *)wbuf));
-    if (strcmp((char *)wbuf, "test") == 0) {
-        printf("Wide string equals 'test'\n");
+void *threadFunc(void *arg) {
+    while (1) {
+        // Hilo ejecutando
     }
-
-    // Incorrecto: Usar funciones de cadenas anchas con cadenas estrechas
-    wcscpy((wchar_t *)buf, L"test");
-    wcscat((wchar_t *)buf, L"test");
-    wprintf(L"Length of narrow string: %lu\n", wcslen((wchar_t *)buf));
-    if (wcscmp((wchar_t *)buf, L"test") == 0) {
-        wprintf(L"Narrow string equals 'test'\n");
-    }
+    return NULL;
 }
 
 int main() {
-    checkStringFunctions();
+    pthread_t thread;
+    int res = pthread_create(&thread, NULL, threadFunc, NULL);
+    if (res != 0) {
+        perror("Thread creation failed");
+        exit(EXIT_FAILURE);
+    }
+
+    // Incorrecto: Cancelar hilo de manera asíncrona
+    pthread_cancel(thread);
+
+    res = pthread_join(thread, NULL);
+    if (res != 0) {
+        perror("Thread join failed");
+        exit(EXIT_FAILURE);
+    }
+
     return 0;
 }
