@@ -1,35 +1,49 @@
 #include <stdio.h>
-#include <wchar.h>
+#include <string.h>
 
-void checkFileChar(FILE *file) {
-    int c;
-    while ((c = fgetc(file)) != EOF) {
-        // Procesar el carácter leído
-        printf("Character read: %c\n", c);
-    }
-
-    if (c == EOF) {
-        printf("Reached end of file\n");
+void checkFgets(FILE *file) {
+    char buf[100];
+    if (fgets(buf, sizeof(buf), file)) {
+        // Incorrecto: Asume que fgets devuelve una cadena no vacía
+        printf("Read line: %s\n", buf);
     }
 }
 
-void checkFileWChar(FILE *file) {
-    wint_t wc;
-    while ((wc = fgetwc(file)) != WEOF) {
-        // Procesar el carácter leído
-        wprintf(L"Character read: %lc\n", wc);
+void checkFgetsCorrectly(FILE *file) {
+    char buf[100];
+    if (fgets(buf, sizeof(buf), file)) {
+        // Correcto: Verifica si la cadena no está vacía antes de usarla
+        if (strlen(buf) > 0) {
+            printf("Read non-empty line: %s\n", buf);
+        }
     }
+}
 
-    if (wc == WEOF) {
-        wprintf(L"Reached end of file\n");
+void checkFgetws(FILE *file) {
+    wchar_t buf[100];
+    if (fgetws(buf, sizeof(buf)/sizeof(wchar_t), file)) {
+        // Incorrecto: Asume que fgetws devuelve una cadena no vacía
+        wprintf(L"Read line: %ls\n", buf);
+    }
+}
+
+void checkFgetwsCorrectly(FILE *file) {
+    wchar_t buf[100];
+    if (fgetws(buf, sizeof(buf)/sizeof(wchar_t), file)) {
+        // Correcto: Verifica si la cadena no está vacía antes de usarla
+        if (wcslen(buf) > 0) {
+            wprintf(L"Read non-empty line: %ls\n", buf);
+        }
     }
 }
 
 int main() {
     FILE *file = fopen("test.txt", "r");
     if (file != NULL) {
-        checkFileChar(file);
-        checkFileWChar(file);
+        checkFgets(file);
+        checkFgetsCorrectly(file);
+        checkFgetws(file);
+        checkFgetwsCorrectly(file);
         fclose(file);
     } else {
         printf("Error opening file\n");

@@ -1,7 +1,8 @@
 import java.util.HashSet;
 import org.antlr.v4.runtime.tree.ParseTree;
 
-public class CCertVisitor extends CBaseVisitor{
+public class CCertVisitor extends CBaseVisitor {
+
     // EXP33-C. Set de identificadores (variables) no declarados al inicializarse
     private final HashSet<String> undeclaredIdentifiers = new HashSet<String>();
 
@@ -28,8 +29,10 @@ public class CCertVisitor extends CBaseVisitor{
     @Override
     public Object visitPrimaryExpression(CParser.PrimaryExpressionContext ctx) {
         // EXP33-C
-        if (ctx.Identifier() != null && undeclaredIdentifiers.contains(ctx.Identifier().getText())) {
-            System.out.printf("Error <%d,%d> ",ctx.Identifier().getSymbol().getLine(),ctx.Identifier().getSymbol().getCharPositionInLine() + 1);
+        if (ctx.Identifier() != null && undeclaredIdentifiers.contains(
+            ctx.Identifier().getText())) {
+            System.out.printf("Error <%d,%d> ", ctx.Identifier().getSymbol().getLine(),
+                ctx.Identifier().getSymbol().getCharPositionInLine() + 1);
             System.out.println("EXP33-C. Do not read uninitialized memory");
         }
 
@@ -45,10 +48,43 @@ public class CCertVisitor extends CBaseVisitor{
                 if (ctx.getText().contains("EOF") || ctx.getText().contains("WEOF")) {
                     System.out.printf("Error <%d,%d> ", ctx.getStart().getLine(),
                         ctx.getStart().getCharPositionInLine() + 1);
-                    System.out.println("FIO34-C. Distinguish between characters read from a file and EOF or WEOF");
+                    System.out.println(
+                        "FIO34-C. Distinguish between characters read from a file and EOF or WEOF");
                 }
             }
         }
         return super.visitEqualityExpression(ctx);
+    }
+
+    // FIO37-C: Do not assume that fgets() or fgetws() returns a nonempty string when successful
+    @Override
+    public Object visitPostfixExpression(CParser.PostfixExpressionContext ctx) {
+        if (ctx.getText().contains("fgets") || ctx.getText().contains("fgetws")) {
+            String variable = ctx.primaryExpression().getText();
+            ParseTree parent = ctx.getParent();
+            while (parent != null && !(parent instanceof CParser.CompoundStatementContext)) {
+                parent = parent.getParent();
+            }
+
+            if (parent != null && parent instanceof CParser.CompoundStatementContext) {
+                CParser.CompoundStatementContext block = (CParser.CompoundStatementContext) parent;
+                if (!isStringChecked(variable, block)) {
+                    System.out.printf("Error <%d,%d> ", ctx.getStart().getLine(),
+                        ctx.getStart().getCharPositionInLine() + 1);
+                    System.out.println("FIO37-C. Do not assume that fgets() or fgetws() returns a nonempty string when successful");
+                }
+            }
+        }
+        return super.visitPostfixExpression(ctx);
+    }
+
+    private boolean isStringChecked(String variable, CParser.CompoundStatementContext block) {
+        // Verificar si el bloque contiene una verificación de la longitud de la cadena
+        for (ParseTree child : block.children) {
+            if (child.getText().contains(variable) && child.getText().contains("strlen")) {
+                return true;
+            }
+        }
+        return false;
     }
 }
