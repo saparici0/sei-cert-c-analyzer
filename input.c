@@ -13,4 +13,5 @@ void func(void) {
       printf("%ld, ", random());
     }
   }
+
 }
