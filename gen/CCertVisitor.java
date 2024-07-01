@@ -1,4 +1,5 @@
 import java.util.HashSet;
+import org.antlr.v4.runtime.tree.ParseTree;
 
 public class CCertVisitor extends CBaseVisitor{
     // EXP33-C. Set de identificadores (variables) no declarados al inicializarse
@@ -33,5 +34,21 @@ public class CCertVisitor extends CBaseVisitor{
         }
 
         return super.visitPrimaryExpression(ctx);
+    }
+
+    // FIO34-C: Distinguish between characters read from a file and EOF or WEOF
+    @Override
+    public Object visitEqualityExpression(CParser.EqualityExpressionContext ctx) {
+        // Verificar si la expresión contiene una llamada a fgetc o fgetwc y una comparación con EOF o WEOF
+        if (ctx.getText().contains("fgetc") || ctx.getText().contains("fgetwc")) {
+            if (ctx.getText().contains("==") || ctx.getText().contains("!=")) {
+                if (ctx.getText().contains("EOF") || ctx.getText().contains("WEOF")) {
+                    System.out.printf("Error <%d,%d> ", ctx.getStart().getLine(),
+                        ctx.getStart().getCharPositionInLine() + 1);
+                    System.out.println("FIO34-C. Distinguish between characters read from a file and EOF or WEOF");
+                }
+            }
+        }
+        return super.visitEqualityExpression(ctx);
     }
 }
