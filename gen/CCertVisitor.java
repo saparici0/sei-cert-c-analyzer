@@ -87,4 +87,31 @@ public class CCertVisitor extends CBaseVisitor {
         }
         return false;
     }
+
+
+    // STR38-C: Do not confuse narrow and wide character strings and functions
+    @Override
+    public Object visitExpression(CParser.ExpressionContext ctx) {
+        String text = ctx.getText();
+        String[] narrowStringFunctions = {"strlen", "strcpy", "strcat", "strcmp"};
+        String[] wideStringFunctions = {"wcslen", "wcscpy", "wcscat", "wcscmp"};
+
+        for (String func : narrowStringFunctions) {
+            if (text.contains(func) && text.contains("wchar_t")) {
+                System.out.printf("Error <%d,%d> ", ctx.getStart().getLine(),
+                    ctx.getStart().getCharPositionInLine() + 1);
+                System.out.println("STR38-C. Do not confuse narrow and wide character strings and functions: Using narrow string function with wide string");
+            }
+        }
+
+        for (String func : wideStringFunctions) {
+            if (text.contains(func) && text.contains("char")) {
+                System.out.printf("Error <%d,%d> ", ctx.getStart().getLine(),
+                    ctx.getStart().getCharPositionInLine() + 1);
+                System.out.println("STR38-C. Do not confuse narrow and wide character strings and functions: Using wide string function with narrow string");
+            }
+        }
+
+        return super.visitExpression(ctx);
+    }
 }
