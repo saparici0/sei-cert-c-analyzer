@@ -1,14 +1,13 @@
 import java.sql.SQLOutput;
-import java.util.ArrayList;
-import java.util.Dictionary;
-import java.util.HashSet;
-import java.util.Hashtable;
+import java.util.*;
 
 public class CCertVisitor extends CBaseVisitor {
     // EXP33-C. Set de identificadores (variables) no declarados al inicializarse
     private final HashSet<String> undeclaredIdentifiers = new HashSet<String>();
     // Diccionario de variables y tipos
     private final Dictionary<String, String> identifiersTypes = new Hashtable<>();
+
+    private boolean srandom = false;
 
     @Override
     public Object visitDeclaration(CParser.DeclarationContext ctx) {
@@ -149,5 +148,18 @@ public class CCertVisitor extends CBaseVisitor {
         }
 
         return super.visitParameterList(ctx);
+    }
+
+    @Override
+    public Object visitPostfixExpression(CParser.PostfixExpressionContext ctx){
+        if(ctx.primaryExpression() != null && ctx.primaryExpression().getText().equals("srandom") && ctx.primaryExpression().Identifier() != null){
+            srandom = true;
+        }
+        if(ctx.primaryExpression() != null && ctx.primaryExpression().getText().equals("random") && !srandom && ctx.primaryExpression().Identifier() != null){
+            System.out.printf("Error <%d,%d> ", ctx.primaryExpression().Identifier().getSymbol().getLine(), ctx.primaryExpression().Identifier().getSymbol().getCharPositionInLine() + 1);
+            System.out.println("MSC32-C. Properly seed pseudorandom number generators.");
+        }
+
+        return super.visitPostfixExpression(ctx);
     }
 }

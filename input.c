@@ -1,19 +1,16 @@
 #include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
 
-int add(int a, int b) {
-    return(a + b);
-}
-
-int main() {
-    float c, d;
-    int a;
-    int b = 0;
-    int g = 0, h  = 0;
-
-    // printf("%i", a);
-    g = a + b;
-
-    // printf("%i %i %i %i %i %i", c, d, a, b, g, h);
-
-    return 0;
+void func(void) {
+  struct timespec ts;
+  if (timespec_get(&ts, TIME_UTC) == 0) {
+    /* Handle error */
+  } else {
+    srandom(ts.tv_nsec ^ ts.tv_sec);
+    for (unsigned int i = 0; i < 10; ++i) {
+      /* Generates different sequences at different runs */
+      printf("%ld, ", random());
+    }
+  }
 }
