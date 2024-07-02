@@ -200,29 +200,6 @@ public class CCertVisitor extends CBaseVisitor {
     }
 
     @Override
-    public Object visitPostfixExpression(CParser.PostfixExpressionContext ctx){
-        // Check MSC32-C rule
-        if(ctx.primaryExpression() != null && ctx.primaryExpression().getText().equals("srandom") && ctx.primaryExpression().Identifier() != null){
-            srandom = true;
-        }
-        if(ctx.primaryExpression() != null && ctx.primaryExpression().getText().equals("random") && !srandom && ctx.primaryExpression().Identifier() != null){
-            System.out.printf("Error <%d,%d> ", ctx.primaryExpression().Identifier().getSymbol().getLine(), ctx.primaryExpression().Identifier().getSymbol().getCharPositionInLine() + 1);
-            System.out.println("MSC32-C. Properly seed pseudorandom number generators.");
-        }
-        // MSC3E3-C Do not pass invalid data to the asctime() function
-        if(ctx.primaryExpression() != null && ctx.primaryExpression().getText().equals("asctime_s") && ctx.primaryExpression().getText().equals("strtime") && ctx.primaryExpression().Identifier() != null){
-            strftime = true;
-            asctime_c = true;
-        }
-        if(ctx.primaryExpression() != null && ctx.primaryExpression().getText().equals("asctime") && !asctime_c && !strftime && ctx.primaryExpression().Identifier() != null){
-            System.out.printf("Error <%d,%d> ", ctx.primaryExpression().Identifier().getSymbol().getLine(), ctx.primaryExpression().Identifier().getSymbol().getCharPositionInLine() + 1);
-            System.out.println("MSC33-C. The asctime() is deprecated or is an obsolescent funcion, use  asctime_s() or strftime() instead");
-        }
-
-        return super.visitPostfixExpression(ctx);
-    }
-
-    @Override
     public Object visitPostfixExpression(CParser.PostfixExpressionContext ctx) {
         // STR32-C
         if (ctx.primaryExpression() != null && ctx.primaryExpression().Identifier() != null && cStringFunctions.contains(ctx.primaryExpression().Identifier().getText())) {
@@ -258,6 +235,23 @@ public class CCertVisitor extends CBaseVisitor {
                     }
                 }
             }
+        }
+        // MSC32-C
+        if(ctx.primaryExpression() != null && ctx.primaryExpression().getText().equals("srandom") && ctx.primaryExpression().Identifier() != null){
+            srandom = true;
+        }
+        if(ctx.primaryExpression() != null && ctx.primaryExpression().getText().equals("random") && !srandom && ctx.primaryExpression().Identifier() != null){
+            System.out.printf("Error <%d,%d> ", ctx.primaryExpression().Identifier().getSymbol().getLine(), ctx.primaryExpression().Identifier().getSymbol().getCharPositionInLine() + 1);
+            System.out.println("MSC32-C. Properly seed pseudorandom number generators.");
+        }
+        // MSC3E3-C
+        if(ctx.primaryExpression() != null && ctx.primaryExpression().getText().equals("asctime_s") && ctx.primaryExpression().getText().equals("strtime") && ctx.primaryExpression().Identifier() != null){
+            strftime = true;
+            asctime_c = true;
+        }
+        if(ctx.primaryExpression() != null && ctx.primaryExpression().getText().equals("asctime") && !asctime_c && !strftime && ctx.primaryExpression().Identifier() != null){
+            System.out.printf("Error <%d,%d> ", ctx.primaryExpression().Identifier().getSymbol().getLine(), ctx.primaryExpression().Identifier().getSymbol().getCharPositionInLine() + 1);
+            System.out.println("MSC33-C. The asctime() is deprecated or is an obsolescent funcion, use  asctime_s() or strftime() instead");
         }
 
         return super.visitPostfixExpression(ctx);
