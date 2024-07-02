@@ -1,14 +1,19 @@
-import java.sql.SQLOutput;
-import java.util.ArrayList;
-import java.util.Dictionary;
-import java.util.HashSet;
-import java.util.Hashtable;
+import java.util.*;
 
 public class CCertVisitor extends CBaseVisitor {
     // EXP33-C. Set de identificadores (variables) no declarados al inicializarse
     private final HashSet<String> undeclaredIdentifiers = new HashSet<String>();
     // Diccionario de variables y tipos
     private final Dictionary<String, String> identifiersTypes = new Hashtable<>();
+    // STR32-C. Set de identificadores (variables) string no null-terminadas
+    private final HashSet<String> nonNullTerminatedCharSeqs = new HashSet<>();
+
+    ArrayList<String> cStringFunctions = new ArrayList<>(Arrays.asList(
+            "strcpy", "strncpy", "strcat", "strncat", "strcmp", "strncmp", "strlen", "strchr", "strrchr", "strstr", "strpbrk", "strcspn", "strspn", "strtok",
+            "printf", "scanf", "sprintf", "sscanf", "fgets", "fputs",
+            "memcpy", "memmove", "memset",
+            "strerror", "getenv"
+    ));
 
     @Override
     public Object visitDeclaration(CParser.DeclarationContext ctx) {
@@ -66,6 +71,17 @@ public class CCertVisitor extends CBaseVisitor {
                                     tempPostModifier = tempPostModifier.concat(post.get(j));
                                 }
                                 postmodifiers.add(tempPostModifier);
+                                if (type != null && type.equals("char") && tempPostModifier.startsWith("[") && tempPostModifier.endsWith("]")) {
+                                    if (ctx.initDeclaratorList().initDeclarator().get(i).initializer() != null) {
+                                        try {
+                                            if (ctx.initDeclaratorList().initDeclarator().get(i).initializer().getText().length() - 1 != Integer.parseInt(tempPostModifier.substring(1,tempPostModifier.length()-1))){
+                                                if (!ctx.initDeclaratorList().initDeclarator().get(i).initializer().getText().startsWith("\\0", ctx.initDeclaratorList().initDeclarator().get(i).initializer().getText().length() - 3)) {
+                                                    nonNullTerminatedCharSeqs.add(directDeclarator.Identifier().getText());
+                                                }
+                                            }
+                                        } catch (Exception ignored) {}
+                                    }
+                                }
                                 break;
                             } else if (directDeclarator.directDeclarator() != null) {
                                 String tempPost = "";
@@ -83,9 +99,6 @@ public class CCertVisitor extends CBaseVisitor {
                         }
                     }
                 }
-            }
-            for (int i = 0; i < identifiers.size(); i++) {
-                identifiersTypes.put(identifiers.get(i), premodifiers.get(i) + type + postmodifiers.get(i));
             }
         }
 
@@ -123,12 +136,9 @@ public class CCertVisitor extends CBaseVisitor {
 
     @Override
     public Object visitPrimaryExpression(CParser.PrimaryExpressionContext ctx) {
-        // EXP33-C
-        System.out.println(identifiersTypes);
         if (ctx.Identifier() != null) {
-            if (identifiersTypes.get(ctx.Identifier().getText()) != null) {
-                // System.out.println(ctx.Identifier().getText() + ": " + identifiersTypes.get(ctx.Identifier().getText()));
-            } if (undeclaredIdentifiers.contains(ctx.Identifier().getText())) {
+            // EXP33-C
+            if (undeclaredIdentifiers.contains(ctx.Identifier().getText())) {
                 System.out.printf("Error <%d,%d> ", ctx.Identifier().getSymbol().getLine(), ctx.Identifier().getSymbol().getCharPositionInLine() + 1);
                 System.out.println("EXP33-C. Do not read uninitialized memory");
             }
@@ -149,5 +159,23 @@ public class CCertVisitor extends CBaseVisitor {
         }
 
         return super.visitParameterList(ctx);
+    }
+
+    @Override
+    public Object visitPostfixExpression(CParser.PostfixExpressionContext ctx) {
+        if (ctx.primaryExpression() != null && ctx.primaryExpression().Identifier() != null && cStringFunctions.contains(ctx.primaryExpression().Identifier().getText())) {
+            if (!ctx.argumentExpressionList().isEmpty()) {
+                for (String charSeq: nonNullTerminatedCharSeqs) {
+                    for (int i=0; i < ctx.argumentExpressionList().get(0).assignmentExpression().size(); i++) {
+                        if (ctx.argumentExpressionList().get(0).assignmentExpression().get(i).getText().contains(charSeq)) {
+                            System.out.printf("Error <%d,%d> ", ctx.argumentExpressionList().get(0).assignmentExpression().get(i).getStart().getLine(), ctx.argumentExpressionList().get(0).assignmentExpression().get(i).getStart().getCharPositionInLine() + 1);
+                            System.out.println("STR32-C. Do not pass a non-null-terminated character sequence to a library function that expects a string");
+                        }
+                    }
+                }
+            }
+        }
+
+        return super.visitPostfixExpression(ctx);
     }
 }
