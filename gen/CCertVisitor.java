@@ -7,6 +7,7 @@ public class CCertVisitor extends CBaseVisitor {
     private final Dictionary<String, String> identifiersTypes = new Hashtable<>();
     // STR32-C. Set de identificadores (variables) string no null-terminadas
     private final HashSet<String> nonNullTerminatedCharSeqs = new HashSet<>();
+    private final HashSet<String> dynamicallyAllocatedIdentifiers = new HashSet<>();
 
     ArrayList<String> cStringFunctions = new ArrayList<>(Arrays.asList(
             "strcpy", "strncpy", "strcat", "strncat", "strcmp", "strncmp", "strlen", "strchr", "strrchr", "strstr", "strpbrk", "strcspn", "strspn", "strtok",
@@ -58,7 +59,13 @@ public class CCertVisitor extends CBaseVisitor {
                         premodifiers.add("");
                     }
                     if (ctx.initDeclaratorList().initDeclarator().get(i).declarator().directDeclarator().Identifier() != null) {
-                        identifiers.add(ctx.initDeclaratorList().initDeclarator().get(i).declarator().directDeclarator().getText());
+                        identifiers.add(ctx.initDeclaratorList().initDeclarator().get(i).declarator().directDeclarator().Identifier().getText());
+                        // MEM34-C
+                        if (ctx.initDeclaratorList().initDeclarator().get(i).initializer() != null && ctx.initDeclaratorList().initDeclarator().get(i).initializer().getText().contains("malloc")) {
+                            dynamicallyAllocatedIdentifiers.add(ctx.initDeclaratorList().initDeclarator().get(i).declarator().directDeclarator().Identifier().getText());
+                            System.out.println(dynamicallyAllocatedIdentifiers);
+                        }
+
                         postmodifiers.add("");
                     } else {
                         CParser.DirectDeclaratorContext directDeclarator = ctx.initDeclaratorList().initDeclarator().get(i).declarator().directDeclarator();
@@ -67,10 +74,14 @@ public class CCertVisitor extends CBaseVisitor {
                             if (directDeclarator.Identifier() != null) {
                                 identifiers.add(directDeclarator.Identifier().getText());
                                 String tempPostModifier = "";
+
                                 for (int j = post.size() - 1; j >= 0; j--) {
                                     tempPostModifier = tempPostModifier.concat(post.get(j));
                                 }
+
                                 postmodifiers.add(tempPostModifier);
+
+                                // STR32-C
                                 if (type != null && type.equals("char") && tempPostModifier.startsWith("[") && tempPostModifier.endsWith("]")) {
                                     if (ctx.initDeclaratorList().initDeclarator().get(i).initializer() != null) {
                                         try {
@@ -82,6 +93,13 @@ public class CCertVisitor extends CBaseVisitor {
                                         } catch (Exception ignored) {}
                                     }
                                 }
+
+                                // MEM34-C
+                                if (ctx.initDeclaratorList().initDeclarator().get(i).initializer() != null && ctx.initDeclaratorList().initDeclarator().get(i).initializer().getText().contains("malloc")) {
+                                    dynamicallyAllocatedIdentifiers.add(directDeclarator.Identifier().getText());
+                                    System.out.println(dynamicallyAllocatedIdentifiers);
+                                }
+
                                 break;
                             } else if (directDeclarator.directDeclarator() != null) {
                                 String tempPost = "";
@@ -100,7 +118,13 @@ public class CCertVisitor extends CBaseVisitor {
                     }
                 }
             }
+
+            for (int i = 0; i < identifiers.size(); i++) {
+                identifiersTypes.put(identifiers.get(i), premodifiers.get(i) + type + postmodifiers.get(i));
+            }
         }
+
+        System.out.println(identifiersTypes);
 
         return super.visitDeclaration(ctx);
     }
@@ -128,7 +152,14 @@ public class CCertVisitor extends CBaseVisitor {
     @Override
     public Object visitAssignmentExpression(CParser.AssignmentExpressionContext ctx) {
         if (ctx.assignmentOperator() != null && ctx.assignmentOperator().getText().equals("=")) {
+            // EXP33-C
             undeclaredIdentifiers.remove(ctx.unaryExpression().getText());
+            // MEM34-C
+            if (!dynamicallyAllocatedIdentifiers.contains(ctx.unaryExpression().getText()) && (ctx.assignmentExpression().getText().contains("malloc") || ctx.assignmentExpression().getText().contains("realloc"))) {
+                dynamicallyAllocatedIdentifiers.add(ctx.unaryExpression().getText());
+            } else if (dynamicallyAllocatedIdentifiers.contains(ctx.unaryExpression().getText()) && !ctx.assignmentExpression().getText().contains("malloc") && !ctx.assignmentExpression().getText().contains("realloc")) {
+                dynamicallyAllocatedIdentifiers.remove(ctx.unaryExpression().getText());
+            }
         }
 
         return super.visitAssignmentExpression(ctx);
@@ -163,6 +194,7 @@ public class CCertVisitor extends CBaseVisitor {
 
     @Override
     public Object visitPostfixExpression(CParser.PostfixExpressionContext ctx) {
+        // STR32-C
         if (ctx.primaryExpression() != null && ctx.primaryExpression().Identifier() != null && cStringFunctions.contains(ctx.primaryExpression().Identifier().getText())) {
             if (!ctx.argumentExpressionList().isEmpty()) {
                 for (String charSeq: nonNullTerminatedCharSeqs) {
@@ -171,6 +203,18 @@ public class CCertVisitor extends CBaseVisitor {
                             System.out.printf("Error <%d,%d> ", ctx.argumentExpressionList().get(0).assignmentExpression().get(i).getStart().getLine(), ctx.argumentExpressionList().get(0).assignmentExpression().get(i).getStart().getCharPositionInLine() + 1);
                             System.out.println("STR32-C. Do not pass a non-null-terminated character sequence to a library function that expects a string");
                         }
+                    }
+                }
+            }
+        }
+
+        // MEM34-C
+        if (ctx.primaryExpression() != null && ctx.primaryExpression().Identifier() != null && ctx.primaryExpression().Identifier().getText().equals("free")) {
+            if (!ctx.argumentExpressionList().isEmpty()) {
+                for (int i=0; i < ctx.argumentExpressionList().get(0).assignmentExpression().size(); i++) {
+                    if (!dynamicallyAllocatedIdentifiers.contains(ctx.argumentExpressionList().get(0).assignmentExpression().get(i).getText())) {
+                        System.out.printf("Error <%d,%d> ", ctx.argumentExpressionList().get(0).assignmentExpression().get(i).getStart().getLine(), ctx.argumentExpressionList().get(0).assignmentExpression().get(i).getStart().getCharPositionInLine() + 1);
+                        System.out.println("MEM34-C. Only free memory allocated dynamically");
                     }
                 }
             }
