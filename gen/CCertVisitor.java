@@ -1,10 +1,15 @@
 import java.util.HashSet;
+import java.util.regex.Pattern;
 import org.antlr.v4.runtime.tree.ParseTree;
 
 public class CCertVisitor extends CBaseVisitor {
 
     // EXP33-C. Set de identificadores (variables) no declarados al inicializarse
     private final HashSet<String> undeclaredIdentifiers = new HashSet<String>();
+    private final Pattern sensitivePattern = Pattern.compile(
+        ".*(password|passwd|pwd|secret|key|token|apikey|api_key|private_key).*",
+        Pattern.CASE_INSENSITIVE
+    );
 
     @Override
     public Object visitInitDeclarator(CParser.InitDeclaratorContext ctx) {
@@ -71,7 +76,8 @@ public class CCertVisitor extends CBaseVisitor {
                 if (!isStringChecked(variable, block)) {
                     System.out.printf("Error <%d,%d> ", ctx.getStart().getLine(),
                         ctx.getStart().getCharPositionInLine() + 1);
-                    System.out.println("FIO37-C. Do not assume that fgets() or fgetws() returns a nonempty string when successful");
+                    System.out.println(
+                        "FIO37-C. Do not assume that fgets() or fgetws() returns a nonempty string when successful");
                 }
             }
         }
@@ -100,7 +106,8 @@ public class CCertVisitor extends CBaseVisitor {
             if (text.contains(func) && text.contains("wchar_t")) {
                 System.out.printf("Error <%d,%d> ", ctx.getStart().getLine(),
                     ctx.getStart().getCharPositionInLine() + 1);
-                System.out.println("STR38-C. Do not confuse narrow and wide character strings and functions: Using narrow string function with wide string");
+                System.out.println(
+                    "STR38-C. Do not confuse narrow and wide character strings and functions: Using narrow string function with wide string");
             }
         }
 
@@ -108,7 +115,8 @@ public class CCertVisitor extends CBaseVisitor {
             if (text.contains(func) && text.contains("char")) {
                 System.out.printf("Error <%d,%d> ", ctx.getStart().getLine(),
                     ctx.getStart().getCharPositionInLine() + 1);
-                System.out.println("STR38-C. Do not confuse narrow and wide character strings and functions: Using wide string function with narrow string");
+                System.out.println(
+                    "STR38-C. Do not confuse narrow and wide character strings and functions: Using wide string function with narrow string");
             }
         }
 
@@ -124,5 +132,16 @@ public class CCertVisitor extends CBaseVisitor {
             System.out.println("POS47-C. Do not use threads that can be canceled asynchronously");
         }
         return super.visitExpressionStatement(ctx);
+    }
+
+    // MSC41-C: Never hard code sensitive information
+    @Override
+    public Object visitAssignmentExpression(CParser.AssignmentExpressionContext ctx) {
+        if (sensitivePattern.matcher(ctx.getText()).matches()) {
+            System.out.printf("Error <%d,%d> ", ctx.getStart().getLine(),
+                ctx.getStart().getCharPositionInLine() + 1);
+            System.out.println("MSC41-C. Never hard code sensitive information");
+        }
+        return super.visitAssignmentExpression(ctx);
     }
 }
