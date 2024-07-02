@@ -8,12 +8,16 @@ public class CCertVisitor extends CBaseVisitor {
     // STR32-C. Set de identificadores (variables) string no null-terminadas
     private final HashSet<String> nonNullTerminatedCharSeqs = new HashSet<>();
     private final HashSet<String> dynamicallyAllocatedIdentifiers = new HashSet<>();
-
-    ArrayList<String> cStringFunctions = new ArrayList<>(Arrays.asList(
+    // STR32-C
+    private final HashSet<String> cStringFunctions = new HashSet<>(Arrays.asList(
             "strcpy", "strncpy", "strcat", "strncat", "strcmp", "strncmp", "strlen", "strchr", "strrchr", "strstr", "strpbrk", "strcspn", "strspn", "strtok",
             "printf", "scanf", "sprintf", "sscanf", "fgets", "fputs",
             "memcpy", "memmove", "memset",
             "strerror", "getenv"
+    ));
+    // SIG30-C
+    private final HashSet<String> asyncSafeFunctions = new HashSet<>(Arrays.asList(
+            "_Exit","fexecve","posix_trace_event","sigprocmask","_exit","fork","pselect","sigqueue","abort","fstat","pthread_kill","sigset","accept","fstatat","pthread_self","sigsuspend","access","fsync","pthread_sigmask","sleep","aio_error","ftruncate","raise","sockatmark","aio_return","futimens","read","socket","aio_suspend","getegid","readlink","socketpair","alarm","geteuid","readlinkat","stat","bind","getgid","recv","symlink","cfgetispeed","getgroups","recvfrom","symlinkat","cfgetospeed","getpeername","recvmsg","tcdrain","cfsetispeed","getpgrp","rename","tcflow","cfsetospeed","getpid","renameat","tcflush","chdir","getppid","rmdir","tcgetattr","chmod","getsockname","select","tcgetpgrp","chown","getsockopt","sem_post","tcsendbreak","clock_gettime","getuid","send","tcsetattr","close","kill","sendmsg","tcsetpgrp","connect","link","sendto","time","creat","linkat","setgid","timer_getoverrun","dup","listen","setpgid","timer_gettime","dup2","lseek","setsid","timer_settime","execl","lstat","setsockopt","times","execle","mkdir","setuid","umask","execv","mkdirat","shutdown","uname","execve","mkfifo","sigaction","unlink","faccessat","mkfifoat","sigaddset","unlinkat","fchdir","mknod","sigdelset","utime","fchmod","mknodat","sigemptyset","utimensat","fchmodat","open","sigfillset","utimes","fchown","openat","sigismember","wait","fchownat","pause","signal","waitpid","fcntl","pipe","sigpause","write","fdatasync","poll","sigpending"
     ));
 
     @Override
@@ -63,7 +67,6 @@ public class CCertVisitor extends CBaseVisitor {
                         // MEM34-C
                         if (ctx.initDeclaratorList().initDeclarator().get(i).initializer() != null && ctx.initDeclaratorList().initDeclarator().get(i).initializer().getText().contains("malloc")) {
                             dynamicallyAllocatedIdentifiers.add(ctx.initDeclaratorList().initDeclarator().get(i).declarator().directDeclarator().Identifier().getText());
-                            System.out.println(dynamicallyAllocatedIdentifiers);
                         }
 
                         postmodifiers.add("");
@@ -85,19 +88,19 @@ public class CCertVisitor extends CBaseVisitor {
                                 if (type != null && type.equals("char") && tempPostModifier.startsWith("[") && tempPostModifier.endsWith("]")) {
                                     if (ctx.initDeclaratorList().initDeclarator().get(i).initializer() != null) {
                                         try {
-                                            if (ctx.initDeclaratorList().initDeclarator().get(i).initializer().getText().length() - 1 != Integer.parseInt(tempPostModifier.substring(1,tempPostModifier.length()-1))){
+                                            if (ctx.initDeclaratorList().initDeclarator().get(i).initializer().getText().length() - 1 != Integer.parseInt(tempPostModifier.substring(1, tempPostModifier.length() - 1))) {
                                                 if (!ctx.initDeclaratorList().initDeclarator().get(i).initializer().getText().startsWith("\\0", ctx.initDeclaratorList().initDeclarator().get(i).initializer().getText().length() - 3)) {
                                                     nonNullTerminatedCharSeqs.add(directDeclarator.Identifier().getText());
                                                 }
                                             }
-                                        } catch (Exception ignored) {}
+                                        } catch (Exception ignored) {
+                                        }
                                     }
                                 }
 
                                 // MEM34-C
                                 if (ctx.initDeclaratorList().initDeclarator().get(i).initializer() != null && ctx.initDeclaratorList().initDeclarator().get(i).initializer().getText().contains("malloc")) {
                                     dynamicallyAllocatedIdentifiers.add(directDeclarator.Identifier().getText());
-                                    System.out.println(dynamicallyAllocatedIdentifiers);
                                 }
 
                                 break;
@@ -110,7 +113,7 @@ public class CCertVisitor extends CBaseVisitor {
                                 directDeclarator = directDeclarator.directDeclarator();
                             } else if (directDeclarator.declarator() != null) {
                                 if (directDeclarator.declarator().pointer() != null) {
-                                     premodifiers.set(premodifiers.size()-1, premodifiers.get(premodifiers.size()-1).concat(directDeclarator.declarator().pointer().getText()));
+                                    premodifiers.set(premodifiers.size() - 1, premodifiers.get(premodifiers.size() - 1).concat(directDeclarator.declarator().pointer().getText()));
                                 }
                                 directDeclarator = directDeclarator.declarator().directDeclarator();
                             }
@@ -123,8 +126,6 @@ public class CCertVisitor extends CBaseVisitor {
                 identifiersTypes.put(identifiers.get(i), premodifiers.get(i) + type + postmodifiers.get(i));
             }
         }
-
-        System.out.println(identifiersTypes);
 
         return super.visitDeclaration(ctx);
     }
@@ -207,7 +208,6 @@ public class CCertVisitor extends CBaseVisitor {
                 }
             }
         }
-
         // MEM34-C
         if (ctx.primaryExpression() != null && ctx.primaryExpression().Identifier() != null && ctx.primaryExpression().Identifier().getText().equals("free")) {
             if (!ctx.argumentExpressionList().isEmpty()) {
@@ -219,7 +219,43 @@ public class CCertVisitor extends CBaseVisitor {
                 }
             }
         }
+        // SIG30-C
+        if (ctx.primaryExpression() != null && ctx.primaryExpression().Identifier() != null && ctx.primaryExpression().Identifier().getText().equals("signal")) {
+            if (!ctx.argumentExpressionList().isEmpty()) {
+                if (ctx.argumentExpressionList().get(0).assignmentExpression().size() == 2) {
+                    if (!asyncSafeFunctions.contains(ctx.argumentExpressionList().get(0).assignmentExpression().get(1).getText())) {
+                        System.out.printf("Error <%d,%d> ", ctx.argumentExpressionList().get(0).assignmentExpression().get(1).getStart().getLine(), ctx.argumentExpressionList().get(0).assignmentExpression().get(1).getStart().getCharPositionInLine() + 1);
+                        System.out.println("SIG30-C. Call only asynchronous-safe functions within signal handlers");
+                    }
+                }
+            }
+        }
 
         return super.visitPostfixExpression(ctx);
+    }
+
+    @Override
+    public Object visitFunctionDefinition(CParser.FunctionDefinitionContext ctx) {
+        String funcIdentifier = ctx.declarator().directDeclarator().directDeclarator().getText();
+        boolean asyncSafe = true;
+
+        for (int i=0; i < ctx.compoundStatement().blockItemList().blockItem().size(); i++) {
+            try {
+                CParser.PostfixExpressionContext postFixExprCtx = ctx.compoundStatement().blockItemList().blockItem().get(i).statement().expressionStatement().expression().assignmentExpression().get(0).conditionalExpression().logicalOrExpression().logicalAndExpression().get(0).inclusiveOrExpression().get(0).exclusiveOrExpression().get(0).andExpression().get(0).equalityExpression().get(0).relationalExpression().get(0).shiftExpression().get(0).additiveExpression().get(0).multiplicativeExpression().get(0).castExpression().get(0).unaryExpression().postfixExpression();
+                if (postFixExprCtx != null) {
+                    if (postFixExprCtx.primaryExpression() != null && postFixExprCtx.primaryExpression().Identifier() != null) {
+                        if (!asyncSafeFunctions.contains(postFixExprCtx.primaryExpression().Identifier().getText())) {
+                            asyncSafe = false;
+                        }
+                    }
+                }
+            } catch (Exception ignored) {}
+        }
+
+        if (asyncSafe) {
+            asyncSafeFunctions.add(funcIdentifier);
+        }
+
+        return super.visitFunctionDefinition(ctx);
     }
 }
