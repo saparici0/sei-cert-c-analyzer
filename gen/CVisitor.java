@@ -1,4 +1,3 @@
-// Generated from /Users/jude/Projects/Lenguajes/Proyecto/sei-cert-c-analyzer/grammar/C.g4 by ANTLR 4.13.1
 import org.antlr.v4.runtime.tree.ParseTreeVisitor;
 
 /**

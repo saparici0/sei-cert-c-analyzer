@@ -7,9 +7,6 @@ import java.util.List;
 import java.util.Iterator;
 import java.util.ArrayList;
 
-
-
-
 @SuppressWarnings({"all", "warnings", "unchecked", "unused", "cast", "CheckReturnValue"})
 public class CParser extends Parser {
 	static { RuntimeMetaData.checkVersion("4.13.1", RuntimeMetaData.VERSION); }
@@ -227,7 +224,6 @@ public class CParser extends Parser {
 			else return visitor.visitChildren(this);
 		}
 	}
-
 
 	public final PrimaryExpressionContext primaryExpression() throws RecognitionException {
 		PrimaryExpressionContext _localctx = new PrimaryExpressionContext(_ctx, getState());
