@@ -174,6 +174,12 @@ public class CCertVisitor extends CBaseVisitor {
                 dynamicallyAllocatedIdentifiers.remove(ctx.unaryExpression().getText());
             }
         }
+        // MSC41-C
+        if (sensitivePattern.matcher(ctx.getText()).matches()) {
+            System.out.printf("Error <%d,%d> ", ctx.getStart().getLine(),
+                    ctx.getStart().getCharPositionInLine() + 1);
+            System.out.println("MSC41-C. Never hard code sensitive information");
+        }
 
         return super.visitAssignmentExpression(ctx);
     }
@@ -191,7 +197,7 @@ public class CCertVisitor extends CBaseVisitor {
         return super.visitPrimaryExpression(ctx);
     }
 
-    // FIO34-C: Distinguish between characters read from a file and EOF or WEOF
+    // FIO34-C
     @Override
     public Object visitEqualityExpression(CParser.EqualityExpressionContext ctx) {
         // Verificar si la expresión contiene una llamada a fgetc o fgetwc y una comparación con EOF o WEOF
@@ -206,29 +212,6 @@ public class CCertVisitor extends CBaseVisitor {
             }
         }
         return super.visitEqualityExpression(ctx);
-    }
-
-    // FIO37-C: Do not assume that fgets() or fgetws() returns a nonempty string when successful
-    @Override
-    public Object visitPostfixExpression(CParser.PostfixExpressionContext ctx) {
-        if (ctx.getText().contains("fgets") || ctx.getText().contains("fgetws")) {
-            String variable = ctx.primaryExpression().getText();
-            ParseTree parent = ctx.getParent();
-            while (parent != null && !(parent instanceof CParser.CompoundStatementContext)) {
-                parent = parent.getParent();
-            }
-
-            if (parent != null && parent instanceof CParser.CompoundStatementContext) {
-                CParser.CompoundStatementContext block = (CParser.CompoundStatementContext) parent;
-                if (!isStringChecked(variable, block)) {
-                    System.out.printf("Error <%d,%d> ", ctx.getStart().getLine(),
-                        ctx.getStart().getCharPositionInLine() + 1);
-                    System.out.println(
-                        "FIO37-C. Do not assume that fgets() or fgetws() returns a nonempty string when successful");
-                }
-            }
-        }
-        return super.visitPostfixExpression(ctx);
     }
 
     private boolean isStringChecked(String variable, CParser.CompoundStatementContext block) {
@@ -309,6 +292,22 @@ public class CCertVisitor extends CBaseVisitor {
             System.out.printf("Error <%d,%d> ", ctx.primaryExpression().Identifier().getSymbol().getLine(), ctx.primaryExpression().Identifier().getSymbol().getCharPositionInLine() + 1);
             System.out.println("MSC33-C. The asctime() is deprecated or is an obsolescent funcion, use  asctime_s() or strftime() instead");
         }
+        // FIO37-C
+        if (ctx.getText().contains("fgets") || ctx.getText().contains("fgetws")) {
+            String variable = ctx.primaryExpression().getText();
+            ParseTree parent = ctx.getParent();
+            while (parent != null && !(parent instanceof CParser.CompoundStatementContext)) {
+                parent = parent.getParent();
+            }
+
+            if (parent != null && parent instanceof CParser.CompoundStatementContext) {
+                CParser.CompoundStatementContext block = (CParser.CompoundStatementContext) parent;
+                if (!isStringChecked(variable, block)) {
+                    System.out.printf("Error <%d,%d> ", ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine() + 1);
+                    System.out.println("FIO37-C. Do not assume that fgets() or fgetws() returns a nonempty string when successful");
+                }
+            }
+        }
 
         return super.visitPostfixExpression(ctx);
     }
@@ -377,14 +376,4 @@ public class CCertVisitor extends CBaseVisitor {
         return super.visitExpressionStatement(ctx);
     }
 
-    // MSC41-C: Never hard code sensitive information
-    @Override
-    public Object visitAssignmentExpression(CParser.AssignmentExpressionContext ctx) {
-        if (sensitivePattern.matcher(ctx.getText()).matches()) {
-            System.out.printf("Error <%d,%d> ", ctx.getStart().getLine(),
-                ctx.getStart().getCharPositionInLine() + 1);
-            System.out.println("MSC41-C. Never hard code sensitive information");
-        }
-        return super.visitAssignmentExpression(ctx);
-    }
 }
